@@ -1,18 +1,16 @@
 import ApiError from "./apiError.js";
+import { logApiError } from "./customErrorLogger.js";
 
 export default function errorHandler(err, req, res, next) {
   const statusCode = err.status || 500;
-  console.log(":::::::::::::::::::::::::::::::::::::::::::::::::");
-  console.log("Error Encountered");
-  console.log(err);
-  console.log(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
+  logApiError(err, req);
   return res.status(statusCode).json({
     success: false,
     error: {
-      code: err.status,
+      code: statusCode,
       trace: null,
       message: err.message,
-      name: err?.name,
+      name: err?.name || "Error",
     },
   });
 }

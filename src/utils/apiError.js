@@ -1,6 +1,5 @@
 class ApiError extends Error {
   constructor(statusCode, message, name = "", isOperational = true, stack = "") {
-    console.log("API error encountered: " + message);
     super(message);
     this.status = statusCode;
     this.name = name;
