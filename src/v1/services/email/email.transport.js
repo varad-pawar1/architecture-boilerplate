@@ -21,19 +21,32 @@ async function createEtherealTransport() {
   });
 }
 
+function smtpUser() {
+  return (process.env.SMTP_USER || process.env.EMAIL_USER)?.trim();
+}
+
+function smtpPass() {
+  const raw = process.env.SMTP_PASS || process.env.EMAIL_PASS;
+  if (raw == null) return undefined;
+  // Gmail app passwords are often shown with spaces; nodemailer accepts them with or without.
+  return String(raw).replace(/\s+/g, "").trim() || undefined;
+}
+
 /**
  * Resolves the mail transport:
  * - If `SMTP_HOST` is set → your real SMTP (Gmail, SendGrid, etc.).
  * - Else in development (or if `USE_ETHEREAL=true`) → Ethereal fake SMTP so messages appear in a web preview (no DNS/real inbox needed).
  * - Else → no transport (worker logs payload only).
+ *
+ * Credentials: `SMTP_USER` / `SMTP_PASS`, or aliases `EMAIL_USER` / `EMAIL_PASS`.
  */
 export async function resolveMailTransport() {
   const host = process.env.SMTP_HOST?.trim();
   if (host) {
     if (!cachedSmtpTransport) {
       const port = process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : 587;
-      const user = process.env.SMTP_USER;
-      const pass = process.env.SMTP_PASS;
+      const user = smtpUser();
+      const pass = smtpPass();
       cachedSmtpTransport = nodemailer.createTransport({
         host,
         port,
@@ -61,5 +74,5 @@ export async function resolveMailTransport() {
 }
 
 export function getDefaultFrom() {
-  return process.env.EMAIL_FROM || process.env.SMTP_USER || "noreply@localhost";
+  return process.env.EMAIL_FROM || smtpUser() || "noreply@localhost";
 }

@@ -20,7 +20,7 @@ export async function processSendEmailJob(job) {
 
   if (!transport) {
     console.log(
-      "\n\x1b[33m[email]\x1b[0m No mail transport — set SMTP_* in .env, or use Ethereal in dev (see .env.example).\n" +
+      "\n\x1b[33m[email]\x1b[0m No mail transport — set SMTP_HOST and SMTP_USER/SMTP_PASS (or EMAIL_USER/EMAIL_PASS) in .env, or use Ethereal in dev (see .env.example).\n" +
         "  Would send verification to:",
       to,
       "\n  Subject:",
