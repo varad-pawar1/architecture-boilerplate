@@ -8,6 +8,9 @@ export async function verifyPassword(email, password) {
   if (!passMatch) {
     throw new ApiError(401, "Incorrect credentials");
   }
+  if (!userData.isEmailVerified) {
+    throw new ApiError(403, "Please verify your email before signing in", "EMAIL_NOT_VERIFIED");
+  }
   return userData;
 }
 

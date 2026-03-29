@@ -60,6 +60,9 @@ export default async function dbConnect() {
     process.on("SIGINT", function () {
       db.close();
     });
+
+    const { seedEmailTemplates } = await import("../seedEmailTemplates.js");
+    await seedEmailTemplates();
   } catch (err) {
     console.error("dbConnect error =>", err.message);
     console.error(

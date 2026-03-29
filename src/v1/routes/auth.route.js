@@ -8,6 +8,9 @@ router.get("/", (req, res) => {
   return res.status(200).json({ success: true, message: "Auth#index" });
 });
 
+router.get("/verify-email", authController.verifyEmail);
+router.post("/resend-verification", authController.resendVerification);
+
 router.post("/login", authController.loginUser);
 router.post("/register", authController.registerUser);
 router.get("/logout", authController.logout);
