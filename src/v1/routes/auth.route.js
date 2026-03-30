@@ -9,13 +9,18 @@ router.get("/", (req, res) => {
   return res.status(200).json({ success: true, message: "Auth#index" });
 });
 
-router.get("/verify-email", authController.verifyEmail);
-router.post("/resend-verification", authController.resendVerification);
+router.get("/me", authHandle, authController.autoLogin);
 
 router.post("/login", authController.loginUser);
 router.post("/register", authController.registerUser);
+router.post("/google", authController.googleLogin);
+router.post("/forgot-password", authController.forgotPassword);
+router.post("/reset-password", authController.resetPassword);
 router.get("/logout", authController.logout);
-router.get("/me", authHandle, authController.autoLogin);
+
+router.get("/verify-email", authController.verifyEmail);
+router.post("/resend-verification", authController.resendVerification);
+
 router.post("/test-email-error", async (req, res) => {
   try {
     throw new Error("Postman Email Error Test");
@@ -34,4 +39,5 @@ router.post("/test-email-error", async (req, res) => {
     });
   }
 });
+
 export default router;

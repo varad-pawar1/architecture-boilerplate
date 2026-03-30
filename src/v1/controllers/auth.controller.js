@@ -4,7 +4,6 @@ import * as verificationService from "../services/auth/verification.service.js";
 import { queueTemplateEmail } from "../services/email/emailQueue.service.js";
 import { User } from "../../models/user.model.js";
 import { getCookieName, setCookiOptions } from "../../config/constants/cookieConfig.js";
-import url from "node:url";
 import ApiError from "../../utils/apiError.js";
 
 function logoutCookieOpts() {
@@ -14,8 +13,15 @@ function logoutCookieOpts() {
 function cookieOptsForRequest(req) {
   const origin = req.get("origin");
   const opts = { ...setCookiOptions };
-  if (origin && url.parse(origin).hostname === "localhost") {
-    opts.sameSite = "none";
+  if (origin) {
+    try {
+      const { hostname } = new URL(origin);
+      if (hostname === "localhost" || hostname === "127.0.0.1") {
+        opts.sameSite = "none";
+      }
+    } catch {
+      // Malformed origin — leave defaults
+    }
   }
   return opts;
 }
@@ -131,13 +137,8 @@ export async function resendVerification(req, res, next) {
     if (!email) throw new ApiError(400, "Email is required");
 
     const user = await User.findOne({ email: String(email).toLowerCase().trim() });
-    if (!user) {
-      return res.status(200).json({
-        success: true,
-        message: "If an account exists, a verification email has been sent.",
-      });
-    }
-    if (user.isEmailVerified) {
+    if (!user || user.isEmailVerified) {
+      // Always same response to prevent email enumeration
       return res.status(200).json({
         success: true,
         message: "If an account exists, a verification email has been sent.",
@@ -193,8 +194,103 @@ export async function logout(req, res, next) {
     if (sessionToken) {
       await sessionService.destroySession(sessionToken);
     }
+    res.status(200).json({ message: "Logged out" });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function googleLogin(req, res, next) {
+  try {
+    const { idToken } = req.body;
+    if (!idToken) throw new ApiError(400, "idToken is required");
+
+    const googleProfile = await authService.verifyGoogleToken(idToken);
+    const user = await authService.findOrCreateGoogleUser(googleProfile);
+
+    const session_id = await sessionService.setSession({
+      user,
+      ip: req.header("x-forwarded-for") || req.socket?.remoteAddress,
+      user_agent: req.get("user-agent"),
+    });
+
+    const sessionCookieName = getCookieName();
+    res.cookie(sessionCookieName, session_id, cookieOptsForRequest(req));
+
     res.status(200).json({
-      message: "Logged out",
+      message: "Google login successful",
+      data: { user: userToJSON(user) },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function forgotPassword(req, res, next) {
+  try {
+    const { email } = req.body;
+    if (!email) throw new ApiError(400, "Email is required");
+
+    const user = await User.findOne({ email: String(email).toLowerCase().trim() });
+
+    if (!user || !user.isEmailVerified) {
+      return res.status(200).json({
+        success: true,
+        message: "If an account exists, a password reset link has been sent.",
+      });
+    }
+
+    const { plainToken } = await verificationService.issuePasswordResetToken(user._id);
+    const web = process.env.WEB_APP_URL?.replace(/\/$/, "");
+    const base = publicApiBase(req);
+    const resetUrl = web
+      ? `${web}/reset-password?token=${encodeURIComponent(plainToken)}`
+      : `${base}/v1/auth/reset-password?token=${encodeURIComponent(plainToken)}`;
+
+    await queueTemplateEmail({
+      to: user.email,
+      templateSlug: "forgot-password",
+      variables: {
+        name: user.name,
+        resetUrl,
+        appName: appName(),
+        expiresIn: process.env.RESET_PASSWORD_EXPIRATION_MINUTES || "60",
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "If an account exists, a password reset link has been sent.",
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function resetPassword(req, res, next) {
+  try {
+    const { token, password } = req.body;
+    if (!token || !password) throw new ApiError(400, "Token and new password are required");
+    if (password.length < 8) throw new ApiError(400, "Password must be at least 8 characters");
+
+    const record = await verificationService.consumePasswordResetToken(token);
+    await authService.resetPassword(record.user._id, password);
+    await verificationService.VerificationToken.deleteOne({ _id: record._id });
+
+    await sessionService.destroyAllSessions(record.user._id);
+
+    await queueTemplateEmail({
+      to: record.user.email,
+      templateSlug: "password-reset-success",
+      variables: {
+        name: record.user.name,
+        appName: appName(),
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Password reset successfully. You can now sign in with your new password.",
     });
   } catch (error) {
     next(error);
