@@ -269,7 +269,8 @@ export async function forgotPassword(req, res, next) {
 
 export async function resetPassword(req, res, next) {
   try {
-    const { token, password } = req.body;
+    const token = req.body?.token || req.query?.token;
+    const { password } = req.body;
     if (!token || !password) throw new ApiError(400, "Token and new password are required");
     if (password.length < 8) throw new ApiError(400, "Password must be at least 8 characters");
 

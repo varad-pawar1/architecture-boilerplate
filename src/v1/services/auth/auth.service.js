@@ -5,6 +5,9 @@ import { OAuth2Client } from "google-auth-library";
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 export async function verifyGoogleToken(idToken) {
+  if (!process.env.GOOGLE_CLIENT_ID) {
+    throw new ApiError(500, "GOOGLE_CLIENT_ID is not configured");
+  }
   const ticket = await googleClient.verifyIdToken({
     idToken,
     audience: process.env.GOOGLE_CLIENT_ID,
@@ -56,7 +59,10 @@ export async function resetPassword(userId, newPassword) {
   return user;
 }
 export async function verifyPassword(email, password) {
-  const userData = await User.findOne({ email });
+  const normalizedEmail = String(email || "")
+    .toLowerCase()
+    .trim();
+  const userData = await User.findOne({ email: normalizedEmail });
   if (!userData) throw new ApiError(401, "User not found");
   const passMatch = await userData.isPasswordMatch(password);
   if (!passMatch) {
@@ -69,14 +75,17 @@ export async function verifyPassword(email, password) {
 }
 
 export async function registerUser(name, email, password, role = "user") {
-  const existing = await User.findOne({ email });
+  const normalizedEmail = String(email || "")
+    .toLowerCase()
+    .trim();
+  const existing = await User.findOne({ email: normalizedEmail });
   if (existing) {
     throw new ApiError(401, "Email already taken");
   }
   const displayName = name || email.split("@")[0].replace(/[._-]/g, " ");
   const user = await User.create({
     name: displayName,
-    email,
+    email: normalizedEmail,
     password,
     role,
   });
